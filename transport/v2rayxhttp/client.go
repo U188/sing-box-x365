@@ -37,15 +37,11 @@ const (
 )
 
 type Client struct {
-	ctx        context.Context
-	dialer     N.Dialer
-	serverAddr M.Socksaddr
 	transport  common.TypedValue[http.RoundTripper]
 	requestURL url.URL
 	host       string
 	method     string
 	headers    http.Header
-	closeIdle  atomic.Bool
 }
 
 func NewClient(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr, options option.V2RayXHTTPOptions, tlsConfig tls.Config) (adapter.V2RayClientTransport, error) {
@@ -57,6 +53,8 @@ func NewClient(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr, opt
 	// shape (REALITY verifies it), while stream-one always speaks HTTP/2: this
 	// endpoint answers HTTP/1.1 with 200 and then never streams the downlink.
 	transport := &http2.Transport{
+		ReadIdleTimeout: time.Duration(options.IdleTimeout),
+		PingTimeout:     time.Duration(options.PingTimeout),
 		DialTLSContext: func(ctx context.Context, network, addr string, cfg *tls.STDConfig) (net.Conn, error) {
 			return tlsDialer.DialTLSContext(ctx, M.ParseSocksaddr(addr))
 		},
@@ -109,9 +107,6 @@ func NewClient(ctx context.Context, dialer N.Dialer, serverAddr M.Socksaddr, opt
 		headers.Set("Content-Type", "application/grpc")
 	}
 	client := &Client{
-		ctx:        ctx,
-		dialer:     dialer,
-		serverAddr: serverAddr,
 		requestURL: requestURL,
 		host:       requestHost,
 		method:     method,
@@ -163,6 +158,7 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 			conn.Setup(nil, err)
 		} else if response.StatusCode != http.StatusOK {
 			response.Body.Close()
+			cancel()
 			conn.Setup(nil, E.New("xhttp: unexpected status: ", response.Status))
 		} else {
 			conn.Setup(response.Body, nil)
@@ -171,8 +167,10 @@ func (c *Client) DialContext(ctx context.Context) (net.Conn, error) {
 	return conn, nil
 }
 
+// CloseIdleConnections drops pooled HTTP/2 connections; ResetTransport also
+// handles the http2.Transport case that CloseIdleConnections cannot see.
 func (c *Client) CloseIdleConnections() {
-	v2rayhttp.CloseIdleConnections(c.transport.Load())
+	c.transport.Store(v2rayhttp.ResetTransport(c.transport.Load()))
 }
 
 func (c *Client) Close() error {

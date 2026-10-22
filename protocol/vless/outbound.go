@@ -55,6 +55,9 @@ func NewOutbound(ctx context.Context, router adapter.Router, logger log.ContextL
 	options.UUID = cleanUUID
 	var x365UUID uuid.UUID
 	if isX365 {
+		if options.Multiplex != nil && common.PtrValueOrDefault(options.Multiplex).Enabled {
+			return nil, E.New("x365: multiplex is not supported")
+		}
 		parsedUUID, parseErr := uuid.FromString(cleanUUID)
 		if parseErr != nil {
 			return nil, E.Cause(parseErr, "parse x365 uuid")
