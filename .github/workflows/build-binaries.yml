@@ -19,7 +19,7 @@ permissions:
 
 env:
   VERSION: ${{ github.event.inputs.version || github.ref_name }}
-  TAGS: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor"
+  BASE_TAGS: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor"
 
 jobs:
   build:
@@ -29,12 +29,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { goos: windows, goarch: amd64, goamd64: v1, output: windows-amd64 }
-          - { goos: linux,   goarch: amd64, goamd64: v1, output: linux-amd64 }
-          - { goos: linux,   goarch: arm64,             output: linux-arm64 }
-          - { goos: android, goarch: arm64,             output: android-arm64 }
-          - { goos: darwin,  goarch: amd64,             output: darwin-amd64 }
-          - { goos: darwin,  goarch: arm64,             output: darwin-arm64 }
+          - { goos: windows, goarch: amd64, goamd64: v1, output: windows-amd64, tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor" }
+          - { goos: linux,   goarch: amd64, goamd64: v1, output: linux-amd64,   tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor,with_ebpf" }
+          - { goos: linux,   goarch: arm64,             output: linux-arm64,     tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor,with_ebpf" }
+          - { goos: android, goarch: arm64,             output: android-arm64,   tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor,with_ebpf" }
+          - { goos: darwin,  goarch: amd64,             output: darwin-amd64,    tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor" }
+          - { goos: darwin,  goarch: arm64,             output: darwin-arm64,    tags: "with_quic,with_dhcp,with_wireguard,with_utls,with_acme,with_clash_api,with_tailscale,with_gvisor" }
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +52,7 @@ jobs:
         run: |
           EXT=""
           if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
-          CGO_ENABLED=0 go build -tags "$TAGS" -trimpath \
+          CGO_ENABLED=0 go build -tags "${{ matrix.tags }}" -trimpath \
             -ldflags "-X github.com/sagernet/sing-box/constant.Version=${VERSION} -s -w" \
             -o "sing-box-${VERSION}-${{ matrix.output }}${EXT}" ./cmd/sing-box
 
